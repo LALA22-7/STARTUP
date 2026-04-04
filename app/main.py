@@ -173,7 +173,31 @@ async def send_to_meta(payload: dict):
         except Exception as e:
             print(f"❌ Network Error: {e}")
 
-async def send_whatsapp_text(to_phone: str, reply_text: str):
+async def send_main_menu_quick_reply(to_phone: str):
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {"text": "Need anything else?"},
+            "action": {
+                "buttons": [
+                    {
+                        "type": "reply",
+                        "reply": {
+                            "id": "btn_main_menu",
+                            "title": "Back to Main Menu",
+                        },
+                    }
+                ]
+            },
+        },
+    }
+    await send_to_meta(payload)
+
+
+async def send_whatsapp_text(to_phone: str, reply_text: str, *, add_menu_button: bool = True):
     print(f"\n🚀 SENDING TEXT TO {to_phone}: {reply_text}\n")
     payload = {
         "messaging_product": "whatsapp",
@@ -182,6 +206,8 @@ async def send_whatsapp_text(to_phone: str, reply_text: str):
         "text": {"body": reply_text}
     }
     await send_to_meta(payload)
+    if add_menu_button:
+        await send_main_menu_quick_reply(to_phone)
 
 async def send_whatsapp_interactive_menu(to_phone: str):
     print(f"\n🚀 SENDING MAIN MENU TO {to_phone}\n")
@@ -268,6 +294,9 @@ async def receive_whatsapp_message(request: Request):
                     
                     elif button_id == 'btn_ask_question':
                         await send_whatsapp_text(phone_number, "Of course! What would you like to know about City Health Clinic?")
+
+                    elif button_id == 'btn_main_menu':
+                        await send_whatsapp_interactive_menu(phone_number)
 
                 # --- B. They selected a time from the List Menu ---
                 elif interactive_type == 'list_reply':
@@ -363,7 +392,7 @@ async def receive_whatsapp_message(request: Request):
                 raw_text = msg['text']['body'].strip()
                 user_text = raw_text.lower()
 
-                await send_whatsapp_text(phone_number, WELCOME_GUIDE)
+                await send_whatsapp_text(phone_number, WELCOME_GUIDE, add_menu_button=False)
 
                 if 'book appointment' in user_text:
                     await send_available_slots(phone_number)

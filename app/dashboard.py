@@ -76,6 +76,25 @@ def fetch_booked_appointments() -> pd.DataFrame:
         )
 
 
+def apply_time_filter(df: pd.DataFrame, filter_key: str) -> pd.DataFrame:
+    if df.empty or "slot_start" not in df.columns or filter_key == "All":
+        return df
+
+    local_times = pd.to_datetime(df["slot_start"], utc=True).dt.tz_convert(IST)
+    local_dates = local_times.dt.date
+    today = datetime.now(IST).date()
+
+    if filter_key == "Today":
+        return df[local_dates == today].copy()
+
+    if filter_key == "This Week":
+        week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
+        return df[(local_dates >= week_start) & (local_dates <= week_end)].copy()
+
+    return df
+
+
 def format_slots(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
@@ -118,7 +137,7 @@ def format_booked_appointments(df: pd.DataFrame) -> pd.DataFrame:
         for value in formatted["booking_id"]
     ]
     formatted["appointment_status"] = [
-        str(value).capitalize() if pd.notna(value) else "Unknown"
+        str(value).lower() if pd.notna(value) else "unknown"
         for value in formatted["appointment_status"]
     ]
     formatted["patient_name"] = [
@@ -140,6 +159,21 @@ def format_booked_appointments(df: pd.DataFrame) -> pd.DataFrame:
             "appointment_status": "Status",
         }
     )[["Booking ID", "Patient Name", "Phone", "Start", "End", "Status"]]
+
+
+def add_status_badges(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or "Status" not in df.columns:
+        return df
+
+    badge_map = {
+        "booked": "🔵 Booked",
+        "completed": "🟢 Completed",
+        "missed": "🔴 Missed",
+    }
+
+    tagged = df.copy()
+    tagged["Status"] = [badge_map.get(str(value).lower(), "⚪ Unknown") for value in tagged["Status"]]
+    return tagged
 
 
 def create_slot(slot_date, start_time) -> None:
@@ -258,19 +292,25 @@ st.markdown(
 
 st.markdown("<div class='section-title'><span class='big-icon'>🏥</span>Clinic Receptionist Dashboard</div>", unsafe_allow_html=True)
 
+filter_choice = st.radio(
+    "View Range",
+    options=["Today", "This Week", "All"],
+    horizontal=True,
+)
+
 left_col, right_col = st.columns([2, 1])
 
 with left_col:
     st.markdown("<div class='section-title'><span class='big-icon'>📘</span>Booked Appointments</div>", unsafe_allow_html=True)
-    booked_df = fetch_booked_appointments()
+    booked_df = apply_time_filter(fetch_booked_appointments(), filter_choice)
     booked_table = format_booked_appointments(booked_df)
     if booked_table.empty:
         st.info("No booked appointments yet.")
     else:
-        st.dataframe(booked_table, use_container_width=True, hide_index=True)
+        st.dataframe(add_status_badges(booked_table), use_container_width=True, hide_index=True)
 
     st.markdown("<div class='section-title'><span class='big-icon'>🟢</span>Available Slots</div>", unsafe_allow_html=True)
-    open_df = fetch_slots(is_open=True)
+    open_df = apply_time_filter(fetch_slots(is_open=True), filter_choice)
     open_table = format_slots(open_df)
     if open_table.empty:
         st.info("No available slots.")
