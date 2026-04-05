@@ -207,19 +207,9 @@ def render_bookings_table(df: pd.DataFrame) -> None:
 
 
 def render_open_slots_table(df: pd.DataFrame) -> None:
-    st.data_editor(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        disabled=True,
-        key="open_slots_table",
-        column_config={
-            "Slot ID": st.column_config.TextColumn("Slot ID", width="small"),
-            "Start": st.column_config.TextColumn("Start", width="large"),
-            "End": st.column_config.TextColumn("End", width="large"),
-            "Open": st.column_config.TextColumn("Open", width="small"),
-        },
-    )
+    # Streamlit Cloud can be strict with data_editor schema/type inference.
+    # Use dataframe here for robust cross-version rendering.
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
 
 def create_slot(slot_date, start_time) -> None:
@@ -286,37 +276,42 @@ st.markdown(
         --primary-teal: #0f8b8d;
         --primary-teal-dark: #0b6f71;
         --health-blue: #2a6fdb;
+        --text-main: #0f172a; /* High contrast dark text */
+        --text-muted: #475569; /* Secondary text */
         --surface: #ffffff;
-        --surface-soft: #f7fafc;
         --border-soft: #e2e8f0;
-        --success-soft: #dcfce7;
-        --warning-soft: #ffedd5;
     }
 
     .stApp {
-        background: linear-gradient(180deg, #fbfcfe 0%, #f5f8fc 100%);
+        background: #f8fafc;
+    }
+
+    /* Force all standard text, labels, and markdown to be dark and readable */
+    .stApp, .stApp p, .stApp label, .stApp div[data-testid="stMarkdownContainer"] p {
+        color: var(--text-main) !important;
     }
 
     .section-title {
         background: linear-gradient(90deg, var(--primary-teal-dark), var(--primary-teal));
-        color: #ffffff;
+        color: #ffffff !important;
         border-radius: 12px;
         padding: 0.7rem 1rem;
         margin: 0.25rem 0 0.9rem 0;
-        box-shadow: 0 6px 18px rgba(15, 139, 141, 0.22);
+        box-shadow: 0 4px 12px rgba(15, 139, 141, 0.15);
         font-weight: 700;
     }
 
-    .big-icon {
+    /* Ensure icons inside the title stay white */
+    .section-title .big-icon {
         font-size: 1.8rem;
         vertical-align: middle;
         margin-right: 0.45rem;
-        color: #ffffff;
+        color: #ffffff !important;
     }
 
     .stButton > button, div.stFormSubmitButton > button {
         background-color: var(--health-blue);
-        color: #ffffff;
+        color: #ffffff !important;
         border: none;
         font-weight: 600;
         border-radius: 10px;
@@ -325,9 +320,10 @@ st.markdown(
 
     .stButton > button:hover, div.stFormSubmitButton > button:hover {
         background-color: #1f5fc0;
-        color: #ffffff;
+        color: #ffffff !important;
     }
 
+    /* Metric Cards */
     [data-testid="stMetric"] {
         background: var(--surface);
         border: 1px solid var(--border-soft);
@@ -335,13 +331,23 @@ st.markdown(
         padding: 0.4rem 0.7rem;
         box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
     }
+    
+    [data-testid="stMetricLabel"] {
+        color: var(--text-muted) !important;
+    }
+    
+    [data-testid="stMetricValue"] {
+        color: var(--text-main) !important;
+    }
 
+    /* Tables */
     [data-testid="stDataFrame"] {
         border: 1px solid var(--border-soft);
         border-radius: 12px;
         background: var(--surface);
     }
 
+    /* Forms */
     [data-testid="stForm"] {
         background: var(--surface);
         border: 1px solid var(--border-soft);
@@ -349,11 +355,21 @@ st.markdown(
         padding: 0.8rem;
     }
 
+    /* Tabs - Make unselected tabs visible, and selected tabs pop */
+    button[data-baseweb="tab"] p {
+        color: var(--text-muted) !important;
+        font-weight: 500;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] p {
+        color: var(--health-blue) !important;
+        font-weight: 700 !important;
+    }
+
     .danger-zone {
         border-top: 1px dashed #fca5a5;
         margin: 1rem 0 0.8rem 0;
         padding-top: 0.8rem;
-        color: #9f1239;
+        color: #9f1239 !important;
         font-weight: 700;
     }
     </style>
