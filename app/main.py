@@ -250,6 +250,9 @@ async def send_whatsapp_list(to_phone: str, formatted_rows: list):
     await send_to_meta(payload)
 
 # --- THE WEBHOOK ENDPOINTS ---
+@app.get("/keep-alive")
+async def keep_alive():
+    return {"status": "I am awake!"}
 @app.get("/")
 async def root(): return {"status": "Alive!"}
 @app.get("/webhook")
