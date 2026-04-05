@@ -99,13 +99,17 @@ def format_slots(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
+    def pretty(value) -> str:
+        local_dt = pd.to_datetime(value, utc=True).tz_convert(IST)
+        return local_dt.strftime("%A, %b %d - %I:%M %p")
+
     formatted = df.copy()
     formatted["slot_start"] = [
-        pd.to_datetime(value, utc=True).tz_convert(IST).strftime("%b %d, %Y - %I:%M %p")
+        pretty(value)
         for value in formatted["slot_start"]
     ]
     formatted["slot_end"] = [
-        pd.to_datetime(value, utc=True).tz_convert(IST).strftime("%b %d, %Y - %I:%M %p")
+        pretty(value)
         for value in formatted["slot_end"]
     ]
     formatted = formatted.rename(
@@ -123,13 +127,17 @@ def format_booked_appointments(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
+    def pretty(value) -> str:
+        local_dt = pd.to_datetime(value, utc=True).tz_convert(IST)
+        return local_dt.strftime("%A, %b %d - %I:%M %p")
+
     formatted = df.copy()
     formatted["slot_start"] = [
-        pd.to_datetime(value, utc=True).tz_convert(IST).strftime("%b %d, %Y - %I:%M %p")
+        pretty(value)
         for value in formatted["slot_start"]
     ]
     formatted["slot_end"] = [
-        pd.to_datetime(value, utc=True).tz_convert(IST).strftime("%b %d, %Y - %I:%M %p")
+        pretty(value)
         for value in formatted["slot_end"]
     ]
     formatted["booking_id"] = [
@@ -174,6 +182,40 @@ def add_status_badges(df: pd.DataFrame) -> pd.DataFrame:
     tagged = df.copy()
     tagged["Status"] = [badge_map.get(str(value).lower(), "⚪ Unknown") for value in tagged["Status"]]
     return tagged
+
+
+def render_bookings_table(df: pd.DataFrame) -> None:
+    st.data_editor(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        disabled=True,
+        key="bookings_table",
+        column_config={
+            "Booking ID": st.column_config.TextColumn("Booking ID", width="small"),
+            "Patient Name": st.column_config.TextColumn("Patient Name", width="medium"),
+            "Phone": st.column_config.TextColumn("Phone", width="medium"),
+            "Start": st.column_config.TextColumn("Start", width="large"),
+            "End": st.column_config.TextColumn("End", width="large"),
+            "Status": st.column_config.TextColumn("Status", width="medium"),
+        },
+    )
+
+
+def render_open_slots_table(df: pd.DataFrame) -> None:
+    st.data_editor(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        disabled=True,
+        key="open_slots_table",
+        column_config={
+            "Slot ID": st.column_config.TextColumn("Slot ID", width="small"),
+            "Start": st.column_config.TextColumn("Start", width="large"),
+            "End": st.column_config.TextColumn("End", width="large"),
+            "Open": st.column_config.TextColumn("Open", width="small"),
+        },
+    )
 
 
 def create_slot(slot_date, start_time) -> None:
@@ -233,57 +275,82 @@ st.set_page_config(page_title="Receptionist Dashboard", layout="wide")
 st.markdown(
     """
     <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+
     :root {
-        --hospital-green: #1f8f5f;
-        --hospital-green-dark: #146846;
-        --hospital-bg: #f7f4ed;
-        --card-bg: #fdfcf8;
+        --primary-teal: #0f8b8d;
+        --primary-teal-dark: #0b6f71;
+        --health-blue: #2a6fdb;
+        --surface: #ffffff;
+        --surface-soft: #f7fafc;
+        --border-soft: #e2e8f0;
+        --success-soft: #dcfce7;
+        --warning-soft: #ffedd5;
     }
 
     .stApp {
-        background: linear-gradient(180deg, var(--hospital-bg) 0%, #f2eee4 100%);
+        background: linear-gradient(180deg, #fbfcfe 0%, #f5f8fc 100%);
     }
 
     .section-title {
-        background: linear-gradient(90deg, var(--hospital-green-dark), var(--hospital-green));
+        background: linear-gradient(90deg, var(--primary-teal-dark), var(--primary-teal));
         color: #ffffff;
-        border-radius: 10px;
-        padding: 0.65rem 0.9rem;
+        border-radius: 12px;
+        padding: 0.7rem 1rem;
         margin: 0.25rem 0 0.9rem 0;
-        box-shadow: 0 2px 8px rgba(20, 104, 70, 0.18);
+        box-shadow: 0 6px 18px rgba(15, 139, 141, 0.22);
         font-weight: 700;
     }
 
     .big-icon {
-        font-size: 2rem;
+        font-size: 1.8rem;
         vertical-align: middle;
         margin-right: 0.45rem;
         color: #ffffff;
     }
 
     .stButton > button, div.stFormSubmitButton > button {
-        background-color: var(--hospital-green);
+        background-color: var(--health-blue);
         color: #ffffff;
         border: none;
         font-weight: 600;
+        border-radius: 10px;
+        padding: 0.5rem 0.9rem;
     }
 
     .stButton > button:hover, div.stFormSubmitButton > button:hover {
-        background-color: var(--hospital-green-dark);
+        background-color: #1f5fc0;
         color: #ffffff;
     }
 
+    [data-testid="stMetric"] {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        padding: 0.4rem 0.7rem;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    }
+
     [data-testid="stDataFrame"] {
-        border: 1px solid #cde9dd;
-        border-radius: 10px;
-        background: var(--card-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        background: var(--surface);
     }
 
     [data-testid="stForm"] {
-        background: var(--card-bg);
-        border: 1px solid #d8e8de;
-        border-radius: 10px;
-        padding: 0.7rem;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        padding: 0.8rem;
+    }
+
+    .danger-zone {
+        border-top: 1px dashed #fca5a5;
+        margin: 1rem 0 0.8rem 0;
+        padding-top: 0.8rem;
+        color: #9f1239;
+        font-weight: 700;
     }
     </style>
     """,
@@ -298,24 +365,41 @@ filter_choice = st.radio(
     horizontal=True,
 )
 
+# Top-level summary metrics
+booked_all_df = fetch_booked_appointments()
+open_all_df = fetch_slots(is_open=True)
+today_booked_df = apply_time_filter(booked_all_df, "Today")
+today_booked_count = int(today_booked_df["booking_id"].notna().sum()) if not today_booked_df.empty else 0
+open_slots_count = int(len(open_all_df))
+estimated_revenue = today_booked_count * 500
+
+metric_col_1, metric_col_2, metric_col_3 = st.columns(3)
+metric_col_1.metric("Total Appointments Today", today_booked_count)
+metric_col_2.metric("Open Slots Available", open_slots_count)
+metric_col_3.metric("Estimated Revenue", f"Rs {estimated_revenue:,}")
+
 left_col, right_col = st.columns([2, 1])
 
 with left_col:
-    st.markdown("<div class='section-title'><span class='big-icon'>📘</span>Booked Appointments</div>", unsafe_allow_html=True)
-    booked_df = apply_time_filter(fetch_booked_appointments(), filter_choice)
-    booked_table = format_booked_appointments(booked_df)
-    if booked_table.empty:
-        st.info("No booked appointments yet.")
-    else:
-        st.dataframe(add_status_badges(booked_table), use_container_width=True, hide_index=True)
+    tab_bookings, tab_open = st.tabs(["📅 Today's Bookings", "🟢 Open Slots"])
 
-    st.markdown("<div class='section-title'><span class='big-icon'>🟢</span>Available Slots</div>", unsafe_allow_html=True)
-    open_df = apply_time_filter(fetch_slots(is_open=True), filter_choice)
-    open_table = format_slots(open_df)
-    if open_table.empty:
-        st.info("No available slots.")
-    else:
-        st.dataframe(open_table, use_container_width=True, hide_index=True)
+    with tab_bookings:
+        st.markdown("<div class='section-title'><span class='big-icon'>📘</span>Booked Appointments</div>", unsafe_allow_html=True)
+        booked_df = apply_time_filter(fetch_booked_appointments(), filter_choice)
+        booked_table = format_booked_appointments(booked_df)
+        if booked_table.empty:
+            st.info("No booked appointments yet.")
+        else:
+            render_bookings_table(add_status_badges(booked_table))
+
+    with tab_open:
+        st.markdown("<div class='section-title'><span class='big-icon'>🟢</span>Available Slots</div>", unsafe_allow_html=True)
+        open_df = apply_time_filter(fetch_slots(is_open=True), filter_choice)
+        open_table = format_slots(open_df)
+        if open_table.empty:
+            st.info("No available slots.")
+        else:
+            render_open_slots_table(open_table)
 
 with right_col:
     st.markdown("<div class='section-title'><span class='big-icon'>➕</span>Generate New Slot</div>", unsafe_allow_html=True)
@@ -328,10 +412,13 @@ with right_col:
             try:
                 create_slot(selected_date, selected_time)
                 st.success("New slot created successfully.")
+                st.toast("New slot created successfully", icon="✅")
+                st.balloons()
                 st.rerun()
             except Exception as exc:
                 st.error(f"Failed to create slot: {exc}")
 
+    st.markdown("<div class='danger-zone'>Danger Zone</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-title'><span class='big-icon'>🗑️</span>Delete Slot</div>", unsafe_allow_html=True)
     open_slots_for_delete = fetch_slots(is_open=True)
 
