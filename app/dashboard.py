@@ -112,6 +112,10 @@ def format_slots(df: pd.DataFrame) -> pd.DataFrame:
         pretty(value)
         for value in formatted["slot_end"]
     ]
+    formatted["is_open"] = [
+        "🟢 Open" if bool(value) else "🟠 Filled"
+        for value in formatted["is_open"]
+    ]
     formatted = formatted.rename(
         columns={
             "id": "Slot ID",
