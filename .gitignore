@@ -1,6 +1,12 @@
 .env
 google_credentials.json
 
+# Node
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+
 # Python artifacts
 __pycache__/
 *.pyc
