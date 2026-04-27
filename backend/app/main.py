@@ -105,7 +105,7 @@ app.include_router(voice_router)
 # --- STARTUP & SHUTDOWN EVENTS ---
 @app.on_event("startup")
 async def startup_event():
-    """Validate required environment variables, then start the reminder scheduler."""
+    """Validate required environment variables, create tables, then start the reminder scheduler."""
     print("[startup] ClinicOS starting up...")
 
     _REQUIRED_ENV_VARS = ["DATABASE_URL", "META_PHONE_ID", "META_ACCESS_TOKEN"]
@@ -115,6 +115,15 @@ async def startup_event():
             print(f"[startup] ERROR: Required environment variable '{var}' is not set.")
         print("[startup] Aborting — set the missing variables in your .env file and restart.")
         sys.exit(1)
+
+    # Auto-create tables if they don't exist (safe to run on every startup)
+    try:
+        from app.database import engine, Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("[startup] Database tables verified/created")
+    except Exception as e:
+        print(f"[startup] WARNING: Could not create tables: {e}")
 
     start_scheduler()
     print("[startup] Reminder scheduler activated")
