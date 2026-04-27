@@ -28,10 +28,15 @@ app = FastAPI()
 # ---------------------------------------------------------------------------
 # CORS Middleware (Task 4.2)
 # ---------------------------------------------------------------------------
-_frontend_origin = os.getenv("NEXT_PUBLIC_API_URL", "http://localhost:3000")
+# CORS_ORIGINS accepts a comma-separated list of allowed origins.
+# Falls back to NEXT_PUBLIC_API_URL for single-origin setups.
+# Example: CORS_ORIGINS=https://clinicos-nine-ashy.vercel.app,http://localhost:3000
+_cors_env = os.getenv("CORS_ORIGINS") or os.getenv("NEXT_PUBLIC_API_URL", "http://localhost:3000")
+_allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[_frontend_origin],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
     allow_headers=["*"],
