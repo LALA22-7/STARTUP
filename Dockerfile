@@ -16,7 +16,6 @@ RUN pip install --upgrade pip \
 
 COPY backend/app ./app
 COPY backend/agents ./agents
-COPY google_credentials.json ./google_credentials.json
 
 EXPOSE 8000
 

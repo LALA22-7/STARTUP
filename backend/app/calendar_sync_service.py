@@ -19,16 +19,30 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 def get_calendar_service():
-    """Initialize Google Calendar service with service account"""
-    credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE", "google_credentials.json")
-    
-    if not os.path.exists(credentials_file):
-        raise FileNotFoundError(f"Google credentials file not found: {credentials_file}")
-    
-    credentials = service_account.Credentials.from_service_account_file(
-        credentials_file, scopes=SCOPES
-    )
-    
+    """Initialize Google Calendar service with service account.
+
+    Supports two configuration methods (in priority order):
+    1. GOOGLE_CREDENTIALS_JSON env var — full JSON content as a string (recommended for cloud deployments)
+    2. GOOGLE_CREDENTIALS_FILE env var — path to a local credentials file (for local/Docker use)
+    """
+    import json
+    import tempfile
+
+    credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    if credentials_json:
+        # Parse JSON content directly from env var — no file needed
+        info = json.loads(credentials_json)
+        credentials = service_account.Credentials.from_service_account_info(
+            info, scopes=SCOPES
+        )
+    else:
+        credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE", "google_credentials.json")
+        if not os.path.exists(credentials_file):
+            raise FileNotFoundError(f"Google credentials file not found: {credentials_file}")
+        credentials = service_account.Credentials.from_service_account_file(
+            credentials_file, scopes=SCOPES
+        )
+
     service = build("calendar", "v3", credentials=credentials)
     return service
 
