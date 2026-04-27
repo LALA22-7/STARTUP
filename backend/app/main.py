@@ -696,6 +696,158 @@ async def get_patient_encounters(patient_id: int):
     ]
 
 
+# ---------------------------------------------------------------------------
+# Slot management endpoints
+# ---------------------------------------------------------------------------
+
+class SlotCreate(BaseModel):
+    slot_start: datetime
+    slot_end: datetime
+
+class SlotResponse(BaseModel):
+    id: int
+    clinic_id: int
+    slot_start: datetime
+    slot_end: datetime
+    is_open: bool
+
+    class Config:
+        from_attributes = True
+
+@app.get("/api/slots", response_model=List[SlotResponse])
+async def get_slots(clinic_id: int = Query(1)):
+    """Return all open slots for a clinic."""
+    async with AsyncSessionFactory() as session:
+        stmt = (
+            select(Availability_Schedule)
+            .where(Availability_Schedule.clinic_id == clinic_id)
+            .order_by(Availability_Schedule.slot_start)
+        )
+        result = await session.execute(stmt)
+        slots = result.scalars().all()
+    return [SlotResponse(id=s.id, clinic_id=s.clinic_id, slot_start=s.slot_start, slot_end=s.slot_end, is_open=s.is_open) for s in slots]
+
+@app.post("/api/slots", response_model=SlotResponse, status_code=201)
+async def create_slot(body: SlotCreate, clinic_id: int = Query(1)):
+    """Create a new bookable slot."""
+    async with AsyncSessionFactory() as session:
+        async with session.begin():
+            slot = Availability_Schedule(
+                clinic_id=clinic_id,
+                slot_start=body.slot_start,
+                slot_end=body.slot_end,
+                is_open=True,
+            )
+            session.add(slot)
+        await session.refresh(slot)
+    return SlotResponse(id=slot.id, clinic_id=slot.clinic_id, slot_start=slot.slot_start, slot_end=slot.slot_end, is_open=slot.is_open)
+
+@app.delete("/api/slots/{slot_id}", status_code=204)
+async def delete_slot(slot_id: int):
+    """Delete a slot. Fails with 409 if an appointment is linked to it."""
+    async with AsyncSessionFactory() as session:
+        async with session.begin():
+            slot = await session.get(Availability_Schedule, slot_id)
+            if slot is None:
+                raise HTTPException(status_code=404, detail=f"Slot {slot_id} not found")
+            # Check if any appointment references this slot
+            result = await session.execute(
+                select(Appointment).where(Appointment.schedule_id == slot_id).limit(1)
+            )
+            if result.scalar_one_or_none():
+                raise HTTPException(status_code=409, detail="Cannot delete slot with an existing appointment")
+            await session.delete(slot)
+
+# ---------------------------------------------------------------------------
+# Appointment create / delete endpoints
+# ---------------------------------------------------------------------------
+
+class AppointmentCreate(BaseModel):
+    patient_name: str
+    patient_phone: str
+    slot_id: int
+    clinic_id: int = 1
+
+@app.post("/api/appointments", response_model=AppointmentResponse, status_code=201)
+async def create_appointment(body: AppointmentCreate):
+    """Manually create an appointment from the dashboard."""
+    async with AsyncSessionFactory() as session:
+        async with session.begin():
+            # Get or create patient
+            result = await session.execute(
+                select(Patient).where(Patient.phone == body.patient_phone)
+            )
+            patient = result.scalar_one_or_none()
+            if not patient:
+                patient = Patient(
+                    full_name=body.patient_name,
+                    email=phone_to_email(body.patient_phone),
+                    phone=body.patient_phone,
+                )
+                session.add(patient)
+                await session.flush()
+
+            # Lock and claim the slot
+            result = await session.execute(
+                select(Availability_Schedule)
+                .where(Availability_Schedule.id == body.slot_id)
+                .with_for_update()
+            )
+            slot = result.scalar_one_or_none()
+            if slot is None:
+                raise HTTPException(status_code=404, detail="Slot not found")
+            if not slot.is_open:
+                raise HTTPException(status_code=409, detail="Slot is already booked")
+
+            appt = Appointment(
+                clinic_id=body.clinic_id,
+                patient_id=patient.id,
+                schedule_id=slot.id,
+                scheduled_start=slot.slot_start,
+                scheduled_end=slot.slot_end,
+                status="booked",
+            )
+            session.add(appt)
+            slot.is_open = False
+            await session.flush()
+            appt_id = appt.id
+
+        # Reload with patient join
+        result = await session.execute(
+            select(Appointment, Patient)
+            .join(Patient, Appointment.patient_id == Patient.id)
+            .where(Appointment.id == appt_id)
+        )
+        row = result.first()
+        appt, patient = row
+
+    return AppointmentResponse(
+        id=appt.id,
+        clinic_id=appt.clinic_id,
+        patient_id=appt.patient_id,
+        doctor_id=appt.doctor_id,
+        scheduled_start=appt.scheduled_start,
+        scheduled_end=appt.scheduled_end,
+        status=appt.status,
+        patient_name=patient.full_name,
+        patient_phone=patient.phone,
+        booking_id_display=f"{appt.id:04d}",
+    )
+
+@app.delete("/api/appointments/{appointment_id}", status_code=204)
+async def delete_appointment(appointment_id: int):
+    """Delete an appointment and re-open its slot."""
+    async with AsyncSessionFactory() as session:
+        async with session.begin():
+            appt = await session.get(Appointment, appointment_id)
+            if appt is None:
+                raise HTTPException(status_code=404, detail=f"Appointment {appointment_id} not found")
+            # Re-open the slot
+            slot = await session.get(Availability_Schedule, appt.schedule_id)
+            if slot:
+                slot.is_open = True
+            await session.delete(appt)
+
 # --- WEBHOOKS ---
 @app.get("/webhook")
 async def verify_webhook(request: Request):

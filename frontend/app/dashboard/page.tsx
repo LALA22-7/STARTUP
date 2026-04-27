@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Calendar, Clock, AlertCircle } from "lucide-react";
+import { RefreshCw, Calendar, Clock, AlertCircle, Plus } from "lucide-react";
 import { getAppointments } from "@/lib/api";
 import AppointmentCard from "@/components/AppointmentCard";
+import AddAppointmentModal from "@/components/AddAppointmentModal";
 import type { Appointment } from "@/lib/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -76,12 +77,14 @@ function AppointmentColumn({
   icon,
   appointments,
   onStatusChange,
+  onDelete,
   emptyMessage,
 }: {
   title: string;
   icon: React.ElementType;
   appointments: Appointment[];
   onStatusChange: (updated: Appointment) => void;
+  onDelete: (id: number) => void;
   emptyMessage: string;
 }) {
   return (
@@ -96,6 +99,7 @@ function AppointmentColumn({
               key={appt.id}
               appointment={appt}
               onStatusChange={onStatusChange}
+              onDelete={onDelete}
             />
           ))
         )}
@@ -108,6 +112,7 @@ function AppointmentColumn({
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
+  const [showModal, setShowModal] = useState(false);
 
   const {
     data: appointments = [],
@@ -121,13 +126,31 @@ export default function DashboardPage() {
     refetchInterval: REFETCH_INTERVAL,
   });
 
-  // Optimistically update the cached list when a card reports a status change.
   const handleStatusChange = useCallback(
     (updated: Appointment) => {
       queryClient.setQueryData<Appointment[]>(
         ["appointments", CLINIC_ID],
-        (prev = []) =>
-          prev.map((a) => (a.id === updated.id ? updated : a))
+        (prev = []) => prev.map((a) => (a.id === updated.id ? updated : a))
+      );
+    },
+    [queryClient]
+  );
+
+  const handleDelete = useCallback(
+    (id: number) => {
+      queryClient.setQueryData<Appointment[]>(
+        ["appointments", CLINIC_ID],
+        (prev = []) => prev.filter((a) => a.id !== id)
+      );
+    },
+    [queryClient]
+  );
+
+  const handleCreated = useCallback(
+    (appt: Appointment) => {
+      queryClient.setQueryData<Appointment[]>(
+        ["appointments", CLINIC_ID],
+        (prev = []) => [appt, ...prev]
       );
     },
     [queryClient]
@@ -200,18 +223,33 @@ export default function DashboardPage() {
             </p>
           )}
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#0f8b8d] text-white hover:bg-[#0d7a7c] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          data-testid="refresh-button"
-        >
-          <RefreshCw
-            className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#2a6fdb] text-white hover:bg-[#2460c4] transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Appointment
+          </button>
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#0f8b8d] text-white hover:bg-[#0d7a7c] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            data-testid="refresh-button"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {showModal && (
+        <AddAppointmentModal
+          clinicId={CLINIC_ID}
+          onClose={() => setShowModal(false)}
+          onCreated={handleCreated}
+        />
+      )}
 
       {/* Error banner */}
       {isError && (
@@ -250,6 +288,7 @@ export default function DashboardPage() {
               icon={Calendar}
               appointments={confirmed}
               onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
               emptyMessage="No confirmed appointments"
             />
             <AppointmentColumn
@@ -257,6 +296,7 @@ export default function DashboardPage() {
               icon={Clock}
               appointments={waiting}
               onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
               emptyMessage="No patients waiting"
             />
             <AppointmentColumn
@@ -264,6 +304,7 @@ export default function DashboardPage() {
               icon={Calendar}
               appointments={completed}
               onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
               emptyMessage="No completed appointments"
             />
           </div>
@@ -284,6 +325,7 @@ export default function DashboardPage() {
                     key={appt.id}
                     appointment={appt}
                     onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
                   />
                 ))}
               </div>
@@ -306,6 +348,7 @@ export default function DashboardPage() {
                     key={appt.id}
                     appointment={appt}
                     onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
                   />
                 ))}
               </div>

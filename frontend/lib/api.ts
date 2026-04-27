@@ -74,3 +74,48 @@ export async function getPatientEncounters(
 ): Promise<Encounter[]> {
   return apiFetch<Encounter[]>(`/api/patients/${patientId}/encounters`);
 }
+
+// ── Slot management ───────────────────────────────────────────────────────────
+
+export interface Slot {
+  id: number;
+  clinic_id: number;
+  slot_start: string;
+  slot_end: string;
+  is_open: boolean;
+}
+
+export async function getSlots(clinicId: number): Promise<Slot[]> {
+  return apiFetch<Slot[]>(`/api/slots?clinic_id=${clinicId}`);
+}
+
+export async function createSlot(
+  clinicId: number,
+  slot_start: string,
+  slot_end: string
+): Promise<Slot> {
+  return apiFetch<Slot>(`/api/slots?clinic_id=${clinicId}`, {
+    method: "POST",
+    body: JSON.stringify({ slot_start, slot_end }),
+  });
+}
+
+export async function deleteSlot(slotId: number): Promise<void> {
+  await apiFetch<void>(`/api/slots/${slotId}`, { method: "DELETE" });
+}
+
+export async function createAppointment(data: {
+  patient_name: string;
+  patient_phone: string;
+  slot_id: number;
+  clinic_id: number;
+}): Promise<Appointment> {
+  return apiFetch<Appointment>(`/api/appointments`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAppointment(id: number): Promise<void> {
+  await apiFetch<void>(`/api/appointments/${id}`, { method: "DELETE" });
+}
