@@ -119,12 +119,20 @@ async def startup_event():
 
     # Auto-create tables if they don't exist (safe to run on every startup)
     try:
-        from app.database import engine, Base
+        from app.database import engine, Base, Clinic
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         print("[startup] Database tables verified/created")
+
+        # Seed default clinic if none exists
+        async with AsyncSessionFactory() as session:
+            result = await session.execute(select(Clinic).limit(1))
+            if result.scalar_one_or_none() is None:
+                async with session.begin():
+                    session.add(Clinic(id=1, name="City Health Clinic", timezone="Asia/Kolkata"))
+                print("[startup] Default clinic seeded (id=1)")
     except Exception as e:
-        print(f"[startup] WARNING: Could not create tables: {e}")
+        print(f"[startup] WARNING: Could not create tables or seed data: {e}")
 
     start_scheduler()
     print("[startup] Reminder scheduler activated")
