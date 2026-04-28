@@ -123,16 +123,19 @@ async def startup_event():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         print("[startup] Database tables verified/created")
+    except Exception as e:
+        print(f"[startup] WARNING: Could not create tables: {e}")
 
-        # Seed default clinic if none exists
+    # Seed default clinic if none exists (separate session, no transaction conflict)
+    try:
         async with AsyncSessionFactory() as session:
             result = await session.execute(select(Clinic).limit(1))
             if result.scalar_one_or_none() is None:
-                async with session.begin():
-                    session.add(Clinic(id=1, name="City Health Clinic", timezone="Asia/Kolkata"))
+                session.add(Clinic(id=1, name="City Health Clinic", timezone="Asia/Kolkata"))
+                await session.commit()
                 print("[startup] Default clinic seeded (id=1)")
     except Exception as e:
-        print(f"[startup] WARNING: Could not create tables or seed data: {e}")
+        print(f"[startup] WARNING: Could not seed clinic: {e}")
 
     start_scheduler()
     print("[startup] Reminder scheduler activated")
