@@ -26,22 +26,15 @@ load_dotenv()
 app = FastAPI()
 
 # ---------------------------------------------------------------------------
-# CORS Middleware (Task 4.2)
+# CORS Middleware
 # ---------------------------------------------------------------------------
-# CORS_ORIGINS accepts a comma-separated list of allowed origins.
-# Defaults to "*" so the dashboard works immediately after deploy.
-# To restrict: set CORS_ORIGINS=https://clinicos-nine-ashy.vercel.app on Render.
-_cors_env = os.getenv("CORS_ORIGINS", "*")
-if _cors_env == "*":
-    _allowed_origins = ["*"]
-else:
-    _allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
-
+# Allow all origins unconditionally so the dashboard always works.
+# Restrict this after go-live by setting CORS_ORIGINS on Render.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
-    allow_credentials=_cors_env != "*",  # credentials not allowed with wildcard
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
