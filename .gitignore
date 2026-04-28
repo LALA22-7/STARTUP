@@ -7,6 +7,13 @@ frontend/node_modules/
 .next/
 frontend/.next/
 
+# Temp / cache
+.kiro_tmp/
+frontend/.kiro_tmp/
+frontend/frontend/
+.pytest_cache/
+backend/.pytest_cache/
+
 # Python artifacts
 __pycache__/
 *.pyc

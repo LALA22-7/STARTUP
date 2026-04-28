@@ -4,6 +4,10 @@
 
 ClinicOS reduces patient no-shows by 20–40% through automated WhatsApp reminders and dual-channel (WhatsApp + IVR) appointment management. Clinics get a real-time receptionist dashboard, an owner revenue view, and a lightweight EMR — all without asking patients to install an app.
 
+**Live Demo**
+- Frontend: [https://clinicos-nine-ashy.vercel.app](https://clinicos-nine-ashy.vercel.app)
+- Backend API: [https://startup-nqlw.onrender.com/docs](https://startup-nqlw.onrender.com/docs)
+
 ---
 
 ## Why ClinicOS
@@ -13,7 +17,8 @@ Indian clinics lose significant revenue to no-shows. ClinicOS tackles this at th
 - Patients book appointments entirely over WhatsApp — no app download, no web form
 - Automated reminders go out 24 hours before each appointment via WhatsApp and voice call
 - Patients who don't respond get an IVR auto-callback offering to confirm, cancel, or reschedule
-- Receptionists manage the day from a live dashboard; owners track revenue and no-show trends
+- Receptionists manage the day from a live dashboard with full slot and appointment control
+- Owners track revenue, no-show rates, and patient volume from a dedicated analytics view
 
 ---
 
@@ -37,7 +42,7 @@ Patient
 
 Receptionist / Owner / Doctor
   │
-  └─ Browser ──► React/Next.js Frontend ──► GET/PATCH /api/* ──► Backend
+  └─ Browser ──► React/Next.js Frontend ──► GET/PATCH/POST/DELETE /api/* ──► Backend
 ```
 
 ### Key Components
@@ -56,7 +61,7 @@ Receptionist / Owner / Doctor
 
 ## Dashboard Views
 
-**Admin Dashboard (`/dashboard`)** — Receptionist control center. Live appointment queues (Confirmed, Waiting, Completed), upcoming appointments for the next 24 hours, and today's missed list. Status updates reflect within 2 seconds.
+**Admin Dashboard (`/dashboard`)** — Receptionist control center. Live appointment queues (Confirmed, Waiting, Completed), upcoming appointments for the next 24 hours, and today's missed list. Receptionists can add new appointments, manage available slots, mark appointments as completed or missed, and delete appointments — all from the dashboard. Status updates reflect within 2 seconds.
 
 **Owner Dashboard (`/owner`)** — Revenue and operations. Today's revenue, monthly totals, no-show rate, patient volume metrics, and a daily revenue trend chart. Supports month-picker for historical data.
 
@@ -64,11 +69,22 @@ Receptionist / Owner / Doctor
 
 ---
 
+## Slot & Appointment Management
+
+Receptionists can manage availability directly from the dashboard without touching the database:
+
+- **Add slots** — Set date, start time, and end time in IST. Slots appear immediately on WhatsApp for patients to book.
+- **Delete slots** — Remove open slots that are no longer available.
+- **Book appointments manually** — Enter patient name and phone, select a slot, and create the booking. The patient record is created automatically if they don't exist yet.
+- **Delete appointments** — Remove appointments with a confirmation step. The slot is automatically re-opened when an appointment is deleted.
+
+---
+
 ## Tech Stack
 
 ```
 backend/
-  app/main.py              FastAPI app — webhooks, REST API, CORS
+  app/main.py              FastAPI app — webhooks, REST API, CORS, slot/appointment management
   app/database.py          SQLAlchemy ORM (8 tables)
   app/analytics_service.py Revenue and no-show calculations
   app/reminders.py         APScheduler reminder jobs
@@ -80,7 +96,7 @@ frontend/
   app/dashboard/           Admin Dashboard page
   app/owner/               Owner Dashboard page
   app/emr/                 EMR View page
-  components/              AppointmentCard, KPICard, RevenueTrendChart, etc.
+  components/              AppointmentCard, AddAppointmentModal, KPICard, RevenueTrendChart, etc.
   lib/api.ts               Typed fetch wrappers for all backend endpoints
 ```
 
@@ -97,7 +113,7 @@ frontend/
 ### 1. Clone and configure
 
 ```bash
-git clone <repository>
+git clone https://github.com/LALA22-7/STARTUP.git
 cp .env.example .env
 # Fill in required values in .env (see docs/SETUP.md)
 ```
@@ -110,13 +126,20 @@ docker compose up --build
 
 The backend starts at `http://localhost:8000` and the frontend at `http://localhost:3000`.
 
-### 3. Manual start (development)
+### 3. Seed the database
+
+On first run, call the seed endpoint to create the default clinic:
+
+```bash
+curl -X POST http://localhost:8000/admin/seed
+```
+
+### 4. Manual start (development)
 
 ```bash
 # Backend
 cd backend
 pip install -r requirements.txt
-python app/init_db.py        # create tables and seed data
 uvicorn app.main:app --reload --port 8000
 
 # Frontend (separate terminal)
@@ -134,11 +157,17 @@ API docs are available at `http://localhost:8000/docs`.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/appointments` | List appointments (filter by clinic, status, date range) |
+| POST | `/api/appointments` | Manually create an appointment |
 | PATCH | `/api/appointments/{id}/status` | Update appointment status |
+| DELETE | `/api/appointments/{id}` | Delete appointment and re-open its slot |
+| GET | `/api/slots` | List all slots for a clinic |
+| POST | `/api/slots` | Create a new bookable slot |
+| DELETE | `/api/slots/{id}` | Delete an open slot |
 | GET | `/api/analytics/daily` | Daily revenue and appointment counts |
 | GET | `/api/analytics/monthly` | Monthly revenue, no-show rate, daily breakdown |
 | GET | `/api/patients` | List patients (search by name or phone) |
 | GET | `/api/patients/{id}/encounters` | Last 10 clinical encounters for a patient |
+| POST | `/admin/seed` | Seed default clinic data (run once on fresh database) |
 | POST | `/webhook` | Meta WhatsApp webhook receiver |
 | GET | `/webhook` | Meta webhook verification |
 | POST | `/prescription/send` | Generate and deliver prescription PDF via WhatsApp |
@@ -152,24 +181,39 @@ Copy `.env.example` to `.env` and fill in your values. Required variables:
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string (`postgresql+asyncpg://...`) |
 | `META_PHONE_ID` | Meta WhatsApp Business phone number ID |
 | `META_ACCESS_TOKEN` | Meta API access token |
 | `META_VERIFY_TOKEN` | Webhook verification secret |
 | `GROQ_API_KEY` | LLM key for the AI agent swarm |
 | `GEMINI_API_KEY` | Gemini AI key |
 
-Optional (IVR and calendar features degrade gracefully when absent):
+Optional (features degrade gracefully when absent):
 
 | Variable | Purpose |
 |----------|---------|
 | `TWILIO_ACCOUNT_SID` | Twilio account SID |
 | `TWILIO_AUTH_TOKEN` | Twilio auth token |
 | `TWILIO_PHONE_NUMBER` | Twilio outbound phone number |
-| `GOOGLE_CREDENTIALS_FILE` | Path to Google Calendar service account JSON |
+| `GOOGLE_CREDENTIALS_JSON` | Full Google service account JSON as a string (for cloud deployments) |
+| `GOOGLE_CREDENTIALS_FILE` | Path to Google Calendar service account JSON (for local/Docker) |
 | `NEXT_PUBLIC_API_URL` | Backend URL consumed by the frontend (default: `http://localhost:8000`) |
 
 See [docs/SETUP.md](docs/SETUP.md) for step-by-step credential setup and [docs/HOSTING.md](docs/HOSTING.md) for deployment instructions.
+
+---
+
+## Running Tests
+
+```bash
+# Backend — property-based and unit tests (31 tests)
+cd backend
+pytest tests/ -v
+
+# Frontend — component tests (45 tests)
+cd frontend
+npx vitest --run
+```
 
 ---
 

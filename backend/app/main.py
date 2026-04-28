@@ -852,6 +852,29 @@ async def delete_appointment(appointment_id: int):
                 slot.is_open = True
             await session.delete(appt)
 
+# --- SEED ENDPOINT (one-time setup) ---
+@app.post("/admin/seed")
+async def seed_database():
+    """Seed the database with a default clinic. Safe to call multiple times."""
+    from app.database import Clinic, Doctor
+    async with AsyncSessionFactory() as session:
+        # Seed clinic
+        result = await session.execute(select(Clinic).limit(1))
+        clinic = result.scalar_one_or_none()
+        if clinic is None:
+            session.add(Clinic(id=1, name="City Health Clinic", timezone="Asia/Kolkata"))
+            await session.commit()
+            await session.refresh(await session.get(Clinic, 1))
+            clinic_created = True
+        else:
+            clinic_created = False
+
+    return {
+        "status": "ok",
+        "clinic_created": clinic_created,
+        "message": "Database seeded. Clinic id=1 is ready." if clinic_created else "Clinic already exists."
+    }
+
 # --- WEBHOOKS ---
 @app.get("/webhook")
 async def verify_webhook(request: Request):
