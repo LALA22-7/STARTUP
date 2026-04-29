@@ -103,6 +103,13 @@ class EncounterResponse(BaseModel):
 from app.voice import router as voice_router
 app.include_router(voice_router)
 
+# ---------------------------------------------------------------------------
+# Health check — required for Render to confirm the service is up
+# ---------------------------------------------------------------------------
+@app.get("/")
+async def health_check():
+    return {"status": "ok", "service": "ClinicOS"}
+
 # --- STARTUP & SHUTDOWN EVENTS ---
 @app.on_event("startup")
 async def startup_event():
