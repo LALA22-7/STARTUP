@@ -120,6 +120,10 @@ class Appointment(Base):
     scheduled_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     scheduled_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="booked")
+    # Reminder tracking: set when the 2-hour WhatsApp reminder is sent
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Confirmation tracking: set to True when patient replies CONFIRM
+    confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

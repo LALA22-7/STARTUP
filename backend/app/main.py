@@ -925,6 +925,46 @@ async def process_whatsapp_logic(value: Value, msg: Message):
                 await send_available_slots(phone_number)
             elif raw_text.lower() in ['hi', 'hello', 'menu']:
                 await send_whatsapp_interactive_menu(phone_number)
+            elif raw_text.strip().upper() == 'CONFIRM':
+                # Patient confirmed their upcoming appointment — suppress the follow-up call
+                async with AsyncSessionFactory() as session:
+                    async with session.begin():
+                        patient = (await session.execute(
+                            select(Patient).where(Patient.phone == phone_number)
+                        )).scalar_one_or_none()
+                        if patient:
+                            # Confirm the most recent upcoming booked appointment for this patient
+                            appt_result = await session.execute(
+                                select(Appointment)
+                                .where(
+                                    Appointment.patient_id == patient.id,
+                                    Appointment.status == "booked",
+                                    Appointment.scheduled_start > datetime.now(timezone.utc),
+                                )
+                                .order_by(Appointment.scheduled_start.asc())
+                                .limit(1)
+                            )
+                            appt = appt_result.scalar_one_or_none()
+                            if appt:
+                                appt.confirmed = True
+                                appt_time = appt.scheduled_start.astimezone(IST).strftime("%B %d at %I:%M %p")
+                                await send_whatsapp_text(
+                                    phone_number,
+                                    f"✅ Great! Your appointment on *{appt_time}* is confirmed. See you then!",
+                                    add_menu_button=False,
+                                )
+                            else:
+                                await send_whatsapp_text(
+                                    phone_number,
+                                    "We couldn't find an upcoming appointment to confirm. Please contact the clinic if you need help.",
+                                    add_menu_button=False,
+                                )
+                        else:
+                            await send_whatsapp_text(
+                                phone_number,
+                                "We couldn't find your record. Please contact the clinic.",
+                                add_menu_button=False,
+                            )
             else:
                 insights = await agent_manager.analyze(raw_text)
                 triage = next((r["response"] for r in insights if r["agent"] == "Triage Specialist"), "GENERAL")
