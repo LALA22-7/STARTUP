@@ -89,6 +89,7 @@ export default function AppointmentCard({
   }
 
   async function handleDelete() {
+    if (isDeleting) return;          // hard guard — ignore any click while in flight
     if (!confirmDelete) {
       setConfirmDelete(true);
       return;
