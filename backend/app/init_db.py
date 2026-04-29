@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import asyncio
 from datetime import datetime, timedelta, timezone
 from app.database import engine, Base, Clinic, Patient, Availability_Schedule, Encounter, CallLog, Doctor, Appointment, AsyncSessionFactory
+from sqlalchemy import text
 
 async def setup_database():
     print("[db] Connecting to PostgreSQL...")
@@ -19,6 +20,15 @@ async def setup_database():
         await conn.run_sync(Base.metadata.drop_all) 
         await conn.run_sync(Base.metadata.create_all)
         print("[db] Tables built successfully")
+
+        # Ensure reminder columns exist (safe to run on existing DBs too)
+        await conn.execute(
+            text('ALTER TABLE "Appointments" ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ')
+        )
+        await conn.execute(
+            text('ALTER TABLE "Appointments" ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT FALSE')
+        )
+        print("[db] Reminder columns verified")
 
     # 2. Inject Test Data
     async with AsyncSessionFactory() as session:
